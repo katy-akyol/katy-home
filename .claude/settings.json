@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status *)",
+      "Bash(git log *)",
+      "Bash(git diff *)",
+      "Bash(git show *)",
+      "Bash(git branch *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(npm run build)",
+      "Bash(npm run dev)",
+      "Bash(npm run start)",
+      "Bash(npm run lint)",
+      "Bash(npm run test)",
+      "Bash(npm install)",
+      "Bash(npx next build)",
+      "Bash(npx next start *)",
+      "Bash(npx next dev *)",
+      "Bash(grep *)",
+      "Bash(find *)",
+      "Bash(sed *)",
+      "Bash(curl *)",
+      "Bash(ls *)",
+      "Bash(pwd)",
+      "Bash(which *)",
+      "Bash(git init)",
+      "Bash(git clone *)",
+      "Read(//tmp/claude-1000/**)",
+      "Read(//home/katherine/.claude/projects/**)"
+    ]
+  }
+}
