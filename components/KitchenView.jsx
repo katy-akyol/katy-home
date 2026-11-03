@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useNow, usePersistent } from "@/lib/hooks";
 import { SHORT_DAYS, weekKey } from "@/lib/dates";
 import { groceryList, mealFor, recipes } from "@/lib/data";
-import { ArrowIcon, CheckIcon, PotIcon } from "./Icons";
+import { ArrowIcon, CheckIcon, PotIcon, TrashIcon } from "./Icons";
 
 const ORDER = [1, 2, 3, 4, 5, 6, 0];
 
@@ -117,25 +117,106 @@ function Groceries({ week }) {
 
 function Recipes() {
   const [url, setUrl] = useState("");
-  const [tried, setTried] = useState(false);
+  const [cookbook, setCookbook] = usePersistent("kg:cookbook", { recipes: [], subsections: [] });
+  const [editingSection, setEditingSection] = useState(null);
+  const [newSection, setNewSection] = useState("");
+  const [draggedId, setDraggedId] = useState(null);
+
+  const addRecipe = (e) => {
+    e.preventDefault();
+    if (!url.trim()) return;
+
+    try {
+      new URL(url); // Validate URL
+      const id = `recipe-${Date.now()}`;
+      const title = new URL(url).hostname || url;
+
+      setCookbook((prev) => ({
+        ...prev,
+        recipes: [
+          ...prev.recipes,
+          {
+            id,
+            url: url.trim(),
+            title,
+            subsection: null,
+            addedAt: new Date().toISOString(),
+          },
+        ],
+      }));
+      setUrl("");
+    } catch {
+      alert("Please enter a valid URL");
+    }
+  };
+
+  const deleteRecipe = (id) => {
+    setCookbook((prev) => ({
+      ...prev,
+      recipes: prev.recipes.filter((r) => r.id !== id),
+    }));
+  };
+
+  const moveRecipe = (id, subsection) => {
+    setCookbook((prev) => ({
+      ...prev,
+      recipes: prev.recipes.map((r) => (r.id === id ? { ...r, subsection } : r)),
+    }));
+  };
+
+  const addSection = () => {
+    if (!newSection.trim()) return;
+    setCookbook((prev) => ({
+      ...prev,
+      subsections: [...prev.subsections, newSection.trim()],
+    }));
+    setNewSection("");
+    setEditingSection(null);
+  };
+
+  const deleteSection = (section) => {
+    setCookbook((prev) => ({
+      ...prev,
+      subsections: prev.subsections.filter((s) => s !== section),
+      recipes: prev.recipes.map((r) => (r.subsection === section ? { ...r, subsection: null } : r)),
+    }));
+  };
+
+  const moveRecipeUp = (id) => {
+    setCookbook((prev) => {
+      const idx = prev.recipes.findIndex((r) => r.id === id);
+      if (idx <= 0) return prev;
+      const newRecipes = [...prev.recipes];
+      [newRecipes[idx], newRecipes[idx - 1]] = [newRecipes[idx - 1], newRecipes[idx]];
+      return { ...prev, recipes: newRecipes };
+    });
+  };
+
+  const moveRecipeDown = (id) => {
+    setCookbook((prev) => {
+      const idx = prev.recipes.findIndex((r) => r.id === id);
+      if (idx >= prev.recipes.length - 1) return prev;
+      const newRecipes = [...prev.recipes];
+      [newRecipes[idx], newRecipes[idx + 1]] = [newRecipes[idx + 1], newRecipes[idx]];
+      return { ...prev, recipes: newRecipes };
+    });
+  };
+
+  const recipesInSection = (section) =>
+    cookbook.recipes.filter((r) => (section === null ? r.subsection === null : r.subsection === section));
 
   return (
     <>
       <div className="hero-row section-title">
         <h2>Recipe box</h2>
-        <span className="small muted">{recipes.length} recipes</span>
+        <span className="small muted">{recipes.length + cookbook.recipes.length} recipes</span>
       </div>
+
       <section className="card" style={{ marginBottom: "1.5rem" }}>
         <div className="card-head">
           <span className="eyebrow">Add from the web</span>
         </div>
-        <form
-          className="import"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setTried(true);
-          }}
-        >
+        <form className="import" onSubmit={addRecipe}>
           <input
             className="field"
             type="url"
@@ -149,13 +230,107 @@ function Recipes() {
             Add
           </button>
         </form>
-        {tried && (
-          <p className="note">
-            Coming soon: paste any recipe link and it will arrive here as just the recipe, without the long story or the
-            ads.
-          </p>
-        )}
       </section>
+
+      {cookbook.recipes.length > 0 && (
+        <section className="card" style={{ marginBottom: "1.5rem" }}>
+          <div className="card-head">
+            <span className="eyebrow">My cookbook</span>
+            <span className="small muted">{cookbook.recipes.length} saved</span>
+          </div>
+
+          {recipesInSection(null).length > 0 && (
+            <div className="cookbook-section">
+              <h3 style={{ fontSize: "0.9rem", textTransform: "uppercase", marginBottom: "0.75rem" }}>
+                Unsorted
+              </h3>
+              <ul className="cookbook-list">
+                {recipesInSection(null).map((r) => (
+                  <CookbookRecipe
+                    key={r.id}
+                    recipe={r}
+                    onMove={moveRecipe}
+                    onDelete={deleteRecipe}
+                    onMoveUp={moveRecipeUp}
+                    onMoveDown={moveRecipeDown}
+                    sections={cookbook.subsections}
+                  />
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {cookbook.subsections.map((section) => (
+            <div key={section} className="cookbook-section">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <h3 style={{ fontSize: "0.9rem", textTransform: "uppercase", marginBottom: "0.75rem" }}>
+                  {section}
+                </h3>
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => deleteSection(section)}
+                  style={{ padding: "0.25rem 0.5rem", fontSize: "0.8rem" }}
+                >
+                  Delete section
+                </button>
+              </div>
+              <ul className="cookbook-list">
+                {recipesInSection(section).map((r) => (
+                  <CookbookRecipe
+                    key={r.id}
+                    recipe={r}
+                    onMove={moveRecipe}
+                    onDelete={deleteRecipe}
+                    onMoveUp={moveRecipeUp}
+                    onMoveDown={moveRecipeDown}
+                    sections={cookbook.subsections}
+                  />
+                ))}
+              </ul>
+            </div>
+          ))}
+
+          <div style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid var(--line)" }}>
+            {editingSection ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  addSection();
+                }}
+              >
+                <input
+                  className="field"
+                  type="text"
+                  placeholder="Section name"
+                  value={newSection}
+                  onChange={(e) => setNewSection(e.target.value)}
+                  autoFocus
+                  style={{ marginBottom: "0.5rem" }}
+                />
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <button className="btn btn-primary" type="submit">
+                    Create
+                  </button>
+                  <button
+                    className="btn btn-ghost"
+                    type="button"
+                    onClick={() => {
+                      setEditingSection(null);
+                      setNewSection("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <button className="btn btn-ghost" onClick={() => setEditingSection(true)}>
+                + Add section
+              </button>
+            )}
+          </div>
+        </section>
+      )}
 
       <div className="recipe-grid">
         {recipes.map((r) => (
@@ -174,5 +349,59 @@ function Recipes() {
         ))}
       </div>
     </>
+  );
+}
+
+function CookbookRecipe({ recipe, onMove, onDelete, onMoveUp, onMoveDown, sections }) {
+  const [showMenu, setShowMenu] = useState(false);
+
+  return (
+    <li className="cookbook-recipe">
+      <div className="cookbook-recipe-content">
+        <a href={recipe.url} target="_blank" rel="noopener noreferrer" className="cookbook-recipe-link">
+          {recipe.title}
+        </a>
+        <span className="small muted" style={{ display: "block", fontSize: "0.8rem", marginTop: "0.25rem" }}>
+          {recipe.url}
+        </span>
+      </div>
+      <div className="cookbook-recipe-actions">
+        {showMenu ? (
+          <div className="cookbook-menu">
+            {sections.map((section) => (
+              <button
+                key={section}
+                className="cookbook-menu-item"
+                onClick={() => {
+                  onMove(recipe.id, section);
+                  setShowMenu(false);
+                }}
+              >
+                {section}
+              </button>
+            ))}
+            {sections.length > 0 && <div className="cookbook-menu-divider" />}
+            <button
+              className="cookbook-menu-item"
+              onClick={() => {
+                onMove(recipe.id, null);
+                setShowMenu(false);
+              }}
+            >
+              Unsorted
+            </button>
+          </div>
+        ) : (
+          <>
+            <button className="btn btn-ghost" onClick={() => setShowMenu(true)} style={{ fontSize: "0.85rem" }}>
+              Move
+            </button>
+            <button className="btn btn-ghost" onClick={() => onDelete(recipe.id)} aria-label="Delete recipe">
+              <TrashIcon />
+            </button>
+          </>
+        )}
+      </div>
+    </li>
   );
 }
