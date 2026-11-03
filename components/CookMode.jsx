@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { CloseIcon, PotIcon } from "./Icons";
 
 export default function CookMode({ title, steps }) {
@@ -69,7 +70,8 @@ export default function CookMode({ title, steps }) {
         </button>
       </div>
 
-      {open && (
+      {open &&
+        createPortal(
         <div className="cook" role="dialog" aria-modal="true" aria-label={`Cook Mode: ${title}`}>
           <div className="cook-top">
             <span className="awake" style={{ visibility: awake ? "visible" : "hidden" }}>
@@ -119,8 +121,11 @@ export default function CookMode({ title, steps }) {
               </button>
             )}
           </div>
-        </div>
-      )}
+        </div>,
+          // Render at the top of the page so the overlay always covers the screen,
+          // not just the (animated) page wrapper it's declared inside.
+          document.body
+        )}
     </>
   );
 }
